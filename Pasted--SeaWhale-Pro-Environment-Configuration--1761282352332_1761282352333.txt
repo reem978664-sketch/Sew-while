@@ -1,0 +1,82 @@
+# ============================================
+# 🐋 SeaWhale Pro - Environment Configuration
+# ============================================
+
+####################################
+# ⚙️ NETWORK & RPC CONFIGURATION
+####################################
+# قائمة RPCs يُختار منها الأسرع تلقائيًا
+RPC_URLS='["https://rpc.helius.xyz/?api-key=demo-1234","https://ssc-dao.genesysgo.net/","https://solana-api.projectserum.com/"]'
+# RPCs خاصة بـ VPS (اختياري)
+VPS_RPCS='[]'
+# WebSocket لمتابعة حساب الحيتان
+HELIUS_WSS="wss://rpc.helius.xyz/?api-key=demo-1234"
+NETWORK="mainnet-beta"
+
+####################################
+# 🔑 WALLET KEYS
+####################################
+# المفتاح السري بصيغة Base58
+PRIVATE_KEY_BASE58="65i1nasFXfShMs5dFmfwdWxm4qQ9JZbmLE1wvNu2tea9SvGovjdNgBq3XAcxnq2CNxartmVNdBdDwpWTTWZVbtDr"
+# المفتاح العلني (اختياري - يتم استخراجه تلقائياً من المفتاح السري)
+WALLET_PUBLIC_KEY=""
+# عنوان المحفظة الذي تتم مراقبته على Helius
+WHALE_ADDRESS="GUg8hpZhW3GNw9g5QYyhd39CKvqU9FvWhd7tnBAgDsDc"
+
+####################################
+# 💸 TRADING OPTIONS
+####################################
+BUY_AMOUNT_SOL=0.002
+SLIPPAGE_PERCENT=15
+SWAP_MODE="auto"
+MAX_TRADE_SIZE_SOL=0.2
+DAILY_EXPOSURE_LIMIT_USD=1000
+ENABLE_LIVE_TRADING="false"   # تفعيل التداول الحقيقي
+PAPER_MODE="true"             # وضع التجربة بدون تنفيذ حقيقي
+
+####################################
+# ⚔️ STOP LOSS / TRAILING LOGIC
+####################################
+STOP_LOSS_PERCENT=40
+TRAILING_STOP_PERCENT=20
+PRICE_CHECK_INTERVAL_MS=5000
+
+####################################
+# 📊 APIS (MARKET DATA)
+####################################
+PUMPFUN_API_URL="https://api.pump.fun/lookup"
+RAYDIUM_API_URL="https://api.raydium.io"
+PRICE_FEED_API="https://hermes.pyth.network"
+
+####################################
+# 📣 TELEGRAM NOTIFICATIONS
+####################################
+TELEGRAM_BOT_TOKEN=7860845726:AAEiXviyUNxBtIDzfnuMbYvkM0JP4eZME_Y
+TELEGRAM_CHAT_ID=476580462
+
+####################################
+# 🔒 REDIS LOCKS (اختياري)
+####################################
+REDIS_URL=""
+
+####################################
+# 🧠 AI DECISION ENGINE
+####################################
+OPENAI_API_KEY=""        # مفتاح OpenAI لاستخدام GPT في قرارات التداول
+OPENAI_MODEL="gpt-4o-mini"
+
+####################################
+# ⚡ PERFORMANCE TUNING
+####################################
+RPC_FAILURE_THRESHOLD=4
+RPC_COOLDOWN_MS=60000
+LOG_LEVEL="info"
+
+####################################
+# 🚀 CORE SYSTEM SETTINGS
+####################################
+HELIUS_API_KEY=YOUR_HELIUS_API_KEY_HERE
+FAST_RPC=https://api.mainnet-beta.solana.com
+LIVE=false
+PAPER=true
+APP_VERSION=1.0.0
