@@ -1,0 +1,131 @@
+name: 🚀 Deploy SeaWhale Pro to Fly.io
+
+on:
+  push:
+    branches:
+      - main  # 🔁 التشغيل التلقائي عند رفع كود إلى الفرع الرئيسي
+  workflow_dispatch:  # 🖐️ التشغيل اليدوي من واجهة GitHub Actions
+
+permissions:
+  contents: read
+
+env:
+  # 🌐 أسرار البيئة (تُحقن تلقائيًا من GitHub Secrets)
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  HELIUS_WSS: ${{ secrets.HELIUS_WSS }}
+  ENABLE_LIVE_TRADING: ${{ secrets.ENABLE_LIVE_TRADING }}
+  PAPER_MODE: ${{ secrets.PAPER_MODE }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  REDIS_URL: ${{ secrets.REDIS_URL }}
+  RPC_URLS: ${{ secrets.RPC_URLS }}
+  BUY_AMOUNT_SOL: ${{ secrets.BUY_AMOUNT_SOL }}
+  MAX_TRADE_SIZE_SOL: ${{ secrets.MAX_TRADE_SIZE_SOL }}
+  DAILY_EXPOSURE_LIMIT_USD: ${{ secrets.DAILY_EXPOSURE_LIMIT_USD }}
+  STOP_LOSS_PERCENT: ${{ secrets.STOP_LOSS_PERCENT }}
+  TRAILING_STOP_PERCENT: ${{ secrets.TRAILING_STOP_PERCENT }}
+  SLIPPAGE_PERCENT: ${{ secrets.SLIPPAGE_PERCENT }}
+  SWAP_MODE: ${{ secrets.SWAP_MODE }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+  WALLET_PUBLIC_KEY: ${{ secrets.WALLET_PUBLIC_KEY }}
+  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+  NETWORK: ${{ secrets.NETWORK }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # ⏱️ تمديد الوقت لتجنب الإلغاء التلقائي
+
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📥 Install dependencies (auto-fix if needed)
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci || npm install --no-audit --no-fund
+          echo "✅ Dependencies installed successfully."
+
+      - name: 🧪 Verify Helius WebSocket Connection
+        run: |
+          echo "🔍 Checking Helius WSS connectivity..."
+          node -e "
+            const WebSocket = require('ws');
+            const ws = new WebSocket('${{ secrets.HELIUS_WSS }}');
+            ws.on('open', () => { console.log('✅ Helius WSS connected successfully'); process.exit(0); });
+            ws.on('error', (err) => { console.error('❌ Helius WSS connection failed:', err.message); process.exit(1); });
+            setTimeout(() => { console.error('❌ Timeout: No response from Helius WSS'); process.exit(1); }, 7000);
+          "
+
+      - name: 🧱 Build project (if exists)
+        run: npm run build --if-present
+
+      - name: 🔧 Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: 🔐 Authenticate with Fly.io
+        run: flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
+
+      - name: 🚀 Deploy to Fly.io
+        id: deploy
+        run: |
+          echo "🚀 Starting Fly.io deployment for SeaWhale Pro..."
+          flyctl deploy \
+            --app seawhile-by5-vq \
+            --remote-only \
+            --config fly.toml \
+            --now \
+            --strategy immediate \
+            --verbose
+          echo "✅ Deployment completed successfully."
+
+      - name: 🩺 Health Check (port 8080)
+        run: |
+          echo "🧠 Running post-deployment health check..."
+          sleep 10
+          curl -fsS https://seawhile-by5-vq.fly.dev/health \
+            && echo "✅ Health check passed!" \
+            || (echo "❌ Health check failed!" && exit 1)
+
+      - name: 🔁 Auto-Restart if Deployment or WSS fails
+        if: failure()
+        run: |
+          echo "⚠️ Detected a deployment issue, attempting Fly.io machine restart..."
+          flyctl machines restart --app seawhile-by5-vq || echo "⚠️ Restart command failed, please check manually."
+
+      # ✅ Telegram Notification (Success)
+      - name: 📲 Notify Telegram (Success)
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          MSG="✅ *SeaWhale Pro Deployed Successfully!* 🚀%0A🕒 Time: ${TIME}%0A🌍 App: [seawhile-by5-vq.fly.dev](https://seawhile-by5-vq.fly.dev)%0A🔗 [View Logs](${GITHUB_RUN_URL})"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=Markdown"
+
+      # ❌ Telegram Notification (Failure)
+      - name: 📲 Notify Telegram (Failure)
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          MSG="❌ *SeaWhale Pro Deployment Failed!*%0A🕒 Time: ${TIME}%0A🔗 [View Logs](${GITHUB_RUN_URL})"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=Markdown"
