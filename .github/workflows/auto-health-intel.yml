@@ -1,0 +1,94 @@
+name: 🧠 Intelligent Health Monitor — SeaWhale Pro
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # فحص كل 5 دقائق
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  HEALTH_URL: "https://seawhile-by5-vq.fly.dev/health"
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Check health endpoint
+        id: check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+          echo "HTTP_STATUS=$STATUS" >> $GITHUB_ENV
+          if [ "$STATUS" -eq 200 ]; then
+            echo "healthy=true" >> $GITHUB_OUTPUT
+          else
+            echo "healthy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 💾 Track failure count
+        id: track
+        run: |
+          mkdir -p .monitor
+          FAIL_FILE=".monitor/fail_count.txt"
+          COUNT=0
+          if [ -f "$FAIL_FILE" ]; then
+            COUNT=$(cat "$FAIL_FILE")
+          fi
+          if [ "${{ steps.check.outputs.healthy }}" == "false" ]; then
+            COUNT=$((COUNT+1))
+          else
+            COUNT=0
+          fi
+          echo "$COUNT" > "$FAIL_FILE"
+          echo "fail_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "📊 Current fail count: $COUNT"
+
+      - name: ⚠️ Restart app if unhealthy
+        if: steps.check.outputs.healthy == 'false'
+        run: |
+          echo "Restarting Fly.io app..."
+          flyctl auth login --access-token "$FLY_API_TOKEN"
+          flyctl machines restart --app seawhile-by5-vq
+          echo "♻️ Restart command executed."
+
+      - name: 🚫 Disable live trading after 3 failures
+        if: steps.track.outputs.fail_count > 2
+        run: |
+          echo "3+ consecutive failures detected!"
+          echo "Disabling ENABLE_LIVE_TRADING..."
+          gh secret set ENABLE_LIVE_TRADING --body "false"
+          echo "✅ Live trading disabled as a safety measure."
+
+      # ✅ Telegram — success
+      - name: 📲 Notify Telegram (Healthy)
+        if: steps.check.outputs.healthy == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="✅ *SeaWhale Pro Healthy!*%0A🌍 App: seawhile-by5-vq.fly.dev%0AStatus: OK"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MSG}" -d "parse_mode=Markdown"
+
+      # ⚠️ Telegram — restart
+      - name: 📲 Notify Telegram (Restarted)
+        if: steps.check.outputs.healthy == 'false'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="⚠️ *SeaWhale Restart Triggered!*%0AReason: Unhealthy response%0AFailures: ${{ steps.track.outputs.fail_count }}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MSG}" -d "parse_mode=Markdown"
