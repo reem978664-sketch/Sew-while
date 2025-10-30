@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for sew-while on 2025-10-29T08:58:32Z
+# fly.toml app configuration file generated for sew-while-n-nslw on 2025-10-30T06:18:24Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'sew-while'
-primary_region = 'iad'
+app = 'sew-while-n-nslw'
+primary_region = 'lax'
 
 [build]
 
@@ -19,5 +19,5 @@ primary_region = 'iad'
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 1024
+  cpus = 4
+  memory_mb = 2048
